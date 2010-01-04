@@ -44,6 +44,16 @@
 
 /**************************************************************************
  *
+ * Defines
+ *
+ **************************************************************************/
+
+#ifndef STATUS_FATAL_APP_EXIT
+#define STATUS_FATAL_APP_EXIT 0x40000015UL
+#endif
+
+/**************************************************************************
+ *
  * Globals
  *
  **************************************************************************/
@@ -185,8 +195,18 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
 {
    HRESULT status;
 
+   if (g_Verbose) {
+      fprintf(stderr, "uncaught exception - code %08lx (%s chance)\n", 
+              Exception->ExceptionCode, FirstChance ? "first" : "second");
+   }
+
+   /*
+    * Ignore first chance of non fatal or unknown exceptions to allow an
+    * exception handler in the debugee to handled them as usual.
+    */
    if(FirstChance) {
       switch(Exception->ExceptionCode) {
+
       case EXCEPTION_ACCESS_VIOLATION:
       case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
       case EXCEPTION_BREAKPOINT:
@@ -199,7 +219,6 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
       case EXCEPTION_FLT_STACK_CHECK:
       case EXCEPTION_FLT_UNDERFLOW:
       case EXCEPTION_GUARD_PAGE:
-      case EXCEPTION_ILLEGAL_INSTRUCTION:
       case EXCEPTION_IN_PAGE_ERROR:
       case EXCEPTION_INT_DIVIDE_BY_ZERO:
       case EXCEPTION_INT_OVERFLOW:
@@ -209,15 +228,23 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
       case EXCEPTION_PRIV_INSTRUCTION:
       case EXCEPTION_SINGLE_STEP:
       case EXCEPTION_STACK_OVERFLOW:
+      case STATUS_FATAL_APP_EXIT:
+         /* Raised in MSVCRT's abort() */
          break;
+
+      case EXCEPTION_ILLEGAL_INSTRUCTION:
+         /* Often used by applications to detect CPU capabilities (e.g. CPUID,
+          * MMX, etc) */
       case DBG_CONTROL_C:
       default:
          return DEBUG_STATUS_NO_CHANGE;
       }
    }
    
-   fprintf(stderr, "uncaught exception - code %08lx (%s chance)\n", 
-           Exception->ExceptionCode, FirstChance ? "first" : "second");
+   if (!g_Verbose) {
+      fprintf(stderr, "uncaught exception - code %08lx (%s chance)\n", 
+              Exception->ExceptionCode, FirstChance ? "first" : "second");
+   }
 
    g_OutputMask = ~0;
 
