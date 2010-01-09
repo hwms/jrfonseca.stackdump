@@ -70,7 +70,7 @@ static IDebugSymbols* g_Symbols = NULL;
 
 /**************************************************************************
  *
- * Cleanup
+ * Utility
  *
  **************************************************************************/
 
@@ -97,6 +97,72 @@ Abort(void)
    Cleanup();
    
    exit(1);
+}
+
+static HRESULT
+AddBreakpoint(PCSTR expression)
+{
+   IDebugBreakpoint* Bp;
+   HRESULT status;
+   
+   status = g_Control->AddBreakpoint(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &Bp);
+   if (status != S_OK) {
+      fprintf(stderr, "warning: failed to add breakpoint (0x%08x)\n", status);
+      return status;
+   }
+
+   status = Bp->SetOffsetExpression(expression);
+   if (status != S_OK) {
+      fprintf(stderr, "warning: failed to set breakpoint expression %s (0x%08x)\n", expression, status);
+      return status;
+   }
+   
+   status = Bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
+   if (status != S_OK) {
+      fprintf(stderr, "warning: failed to enable breakpoint %s (0x%08x)\n", expression, status);
+      return status;
+   }
+
+   return S_OK;
+}
+
+static void
+DumpStack(void)
+{
+   HRESULT status;
+
+   g_OutputMask = ~0;
+
+   status = g_Control->OutputCurrentState(DEBUG_OUTCTL_ALL_CLIENTS, 
+                                          DEBUG_CURRENT_SYMBOL |
+                                          DEBUG_CURRENT_DISASM |
+                                          DEBUG_CURRENT_REGISTERS |
+                                          DEBUG_CURRENT_SOURCE_LINE);
+   if (status != S_OK) {
+      fprintf(stderr, "warning: failed to output current state (0x%08x)\n", status);
+   }
+
+   status = g_Control->OutputStackTrace(DEBUG_OUTCTL_ALL_CLIENTS, 
+                                        NULL,
+                                        50, 
+                                        DEBUG_STACK_COLUMN_NAMES |
+                                        DEBUG_STACK_FRAME_NUMBERS |
+                                        DEBUG_STACK_FRAME_ADDRESSES |
+                                        DEBUG_STACK_SOURCE_LINE |
+                                        DEBUG_STACK_PARAMETERS);
+   if (status != S_OK) {
+      fprintf(stderr, "error: failed to output a stack trace (0x%08x)\n", status);
+   }
+
+   if (g_DumpPath) {
+      status = g_Client->WriteDumpFile(g_DumpPath, DEBUG_DUMP_SMALL);
+      if (status != S_OK) {
+         fprintf(stderr, "warning: failed to create dump file (0x%08x)\n", status);
+      }
+      if (g_Verbose) {
+         fprintf(stderr, "%s created\n", g_DumpPath);
+      }
+   }
 }
 
 /**************************************************************************
@@ -168,7 +234,18 @@ public:
 
    /* IDebugEventCallbacks */
    HRESULT STDMETHODCALLTYPE GetInterestMask(PULONG Mask);
+   HRESULT STDMETHODCALLTYPE Breakpoint(PDEBUG_BREAKPOINT Bp);
    HRESULT STDMETHODCALLTYPE Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance);
+   HRESULT STDMETHODCALLTYPE CreateProcess(ULONG64 ImageFileHandle, ULONG64 Handle, 
+                                           ULONG64 BaseOffset, ULONG ModuleSize, 
+                                           PCSTR ModuleName, PCSTR ImageName, 
+                                           ULONG CheckSum, ULONG TimeDateStamp, 
+                                           ULONG64 InitialThreadHandle, 
+                                           ULONG64 ThreadDataOffset, ULONG64 StartOffset);
+   HRESULT STDMETHODCALLTYPE LoadModule(ULONG64 ImageFileHandle, ULONG64 BaseOffset, 
+                                        ULONG ModuleSize, PCSTR ModuleName, 
+                                        PCSTR ImageName, ULONG CheckSum, 
+                                        ULONG TimeDateStamp);
 };
 
 ULONG STDMETHODCALLTYPE
@@ -186,15 +263,25 @@ EventCallbacks::Release()
 HRESULT STDMETHODCALLTYPE
 EventCallbacks::GetInterestMask(PULONG Mask)
 {
-   *Mask = DEBUG_EVENT_EXCEPTION;
+   *Mask = DEBUG_EVENT_BREAKPOINT |
+           DEBUG_EVENT_EXCEPTION |
+           DEBUG_EVENT_CREATE_PROCESS |
+           DEBUG_EVENT_LOAD_MODULE;
    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE
+EventCallbacks::Breakpoint(PDEBUG_BREAKPOINT Bp)
+{
+   DumpStack();
+   Abort();
+   
+   return DEBUG_STATUS_GO;
 }
 
 HRESULT STDMETHODCALLTYPE
 EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
 {
-   HRESULT status;
-
    if (g_Verbose) {
       fprintf(stderr, "uncaught exception - code %08lx (%s chance)\n", 
               Exception->ExceptionCode, FirstChance ? "first" : "second");
@@ -246,42 +333,61 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
               Exception->ExceptionCode, FirstChance ? "first" : "second");
    }
 
-   g_OutputMask = ~0;
-
-   status = g_Control->OutputCurrentState(DEBUG_OUTCTL_ALL_CLIENTS, 
-                                          DEBUG_CURRENT_SYMBOL |
-                                          DEBUG_CURRENT_DISASM |
-                                          DEBUG_CURRENT_REGISTERS |
-                                          DEBUG_CURRENT_SOURCE_LINE);
-   if (status != S_OK) {
-      fprintf(stderr, "warning: failed to output current state (0x%08x)\n", status);
-   }
-
-   status = g_Control->OutputStackTrace(DEBUG_OUTCTL_ALL_CLIENTS, 
-                                        NULL,
-                                        50, 
-                                        DEBUG_STACK_COLUMN_NAMES |
-                                        DEBUG_STACK_FRAME_NUMBERS |
-                                        DEBUG_STACK_FRAME_ADDRESSES |
-                                        DEBUG_STACK_SOURCE_LINE |
-                                        DEBUG_STACK_PARAMETERS);
-   if (status != S_OK) {
-      fprintf(stderr, "error: failed to output a stack trace (0x%08x)\n", status);
-   }
-
-   if (g_DumpPath) {
-      status = g_Client->WriteDumpFile(g_DumpPath, DEBUG_DUMP_SMALL);
-      if (status != S_OK) {
-         fprintf(stderr, "warning: failed to create dump file (0x%08x)\n", status);
-      }
-      if (g_Verbose) {
-         fprintf(stderr, "%s created\n", g_DumpPath);
-      }
-   }
-
+   DumpStack();
    Abort();
    
    return DEBUG_STATUS_NO_CHANGE;
+}
+
+HRESULT STDMETHODCALLTYPE
+EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
+                              ULONG64 Handle,
+                              ULONG64 BaseOffset,
+                              ULONG ModuleSize,
+                              PCSTR ModuleName,
+                              PCSTR ImageName,
+                              ULONG CheckSum,
+                              ULONG TimeDateStamp,
+                              ULONG64 InitialThreadHandle,
+                              ULONG64 ThreadDataOffset,
+                              ULONG64 StartOffset)
+{
+   UNREFERENCED_PARAMETER(ImageFileHandle);
+   UNREFERENCED_PARAMETER(Handle);
+   UNREFERENCED_PARAMETER(BaseOffset);
+   UNREFERENCED_PARAMETER(ModuleSize);
+   UNREFERENCED_PARAMETER(ModuleName);
+   UNREFERENCED_PARAMETER(BaseOffset);
+   UNREFERENCED_PARAMETER(CheckSum);
+   UNREFERENCED_PARAMETER(TimeDateStamp);
+   UNREFERENCED_PARAMETER(InitialThreadHandle);
+   UNREFERENCED_PARAMETER(ThreadDataOffset);
+   UNREFERENCED_PARAMETER(StartOffset);
+   
+   AddBreakpoint("user32!MessageBoxA");
+   AddBreakpoint("user32!MessageBoxW");
+
+   return DEBUG_STATUS_GO;
+}
+
+HRESULT STDMETHODCALLTYPE
+EventCallbacks::LoadModule(ULONG64 ImageFileHandle,
+                           ULONG64 BaseOffset,
+                           ULONG ModuleSize,
+                           PCSTR ModuleName,
+                           PCSTR ImageName,
+                           ULONG CheckSum,
+                           ULONG TimeDateStamp)
+{
+   UNREFERENCED_PARAMETER(ImageFileHandle);
+   UNREFERENCED_PARAMETER(BaseOffset);
+   UNREFERENCED_PARAMETER(ModuleSize);
+   UNREFERENCED_PARAMETER(ModuleName);
+   UNREFERENCED_PARAMETER(ImageName);
+   UNREFERENCED_PARAMETER(CheckSum);
+   UNREFERENCED_PARAMETER(TimeDateStamp);
+
+   return DEBUG_STATUS_GO;
 }
 
 static EventCallbacks g_EventCb;
