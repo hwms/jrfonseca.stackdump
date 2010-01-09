@@ -1,10 +1,6 @@
 cmake_minimum_required (VERSION 2.6) 
 
-project (STACKDUMP) 
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${STACKDUMP_SOURCE_DIR}")
-
-find_package(WinDbg REQUIRED)
+project (SAMPLES) 
 
 # http://www.cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
 foreach(flag_var
@@ -15,8 +11,10 @@ foreach(flag_var
    endif(${flag_var} MATCHES "/MD")
 endforeach(flag_var)
 
-include_directories (${WINDBG_SDK_INCLUDE_PATH}) 
-
-add_executable (stackdump stackdump.cpp) 
-
-target_link_libraries (stackdump "${WINDBG_SDK_DBGENG_LIBRARY}")
+add_executable (abort abort.c) 
+add_executable (assert assert.c) 
+add_executable (complex complex.c) 
+add_executable (false false.c) 
+add_executable (is_debugger_present is_debugger_present.c) 
+add_executable (output_debug_string output_debug_string.c) 
+add_executable (true true.c) 
