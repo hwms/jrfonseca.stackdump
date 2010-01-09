@@ -1,6 +1,6 @@
 /**************************************************************************
  *
- * Copyright 2009 Jose Fonseca
+ * Copyright 2009-2010 Jose Fonseca
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -105,6 +105,10 @@ AddBreakpoint(PCSTR expression)
    IDebugBreakpoint* Bp;
    HRESULT status;
    
+   if (g_Verbose) {
+      fprintf(stderr, "Adding breakpoing %s\n", expression);
+   }
+
    status = g_Control->AddBreakpoint(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &Bp);
    if (status != S_OK) {
       fprintf(stderr, "warning: failed to add breakpoint (0x%08x)\n", status);
@@ -124,6 +128,23 @@ AddBreakpoint(PCSTR expression)
    }
 
    return S_OK;
+}
+
+static HRESULT
+AddWildcardBreakpoint(PCSTR ModuleName, PCSTR SymbolName)
+{
+   char expression[1024];
+   ULONG64  Offset;
+   HRESULT status;
+
+   _snprintf(expression, sizeof expression, "%s!%s", ModuleName, SymbolName);
+
+   status = g_Symbols->GetOffsetByName(expression, &Offset);
+   if (status != S_OK) {
+      return status;
+   }
+
+   return AddBreakpoint(expression);
 }
 
 static void
@@ -387,6 +408,10 @@ EventCallbacks::LoadModule(ULONG64 ImageFileHandle,
    UNREFERENCED_PARAMETER(CheckSum);
    UNREFERENCED_PARAMETER(TimeDateStamp);
 
+   AddWildcardBreakpoint(ModuleName, "_wassert");
+   AddWildcardBreakpoint(ModuleName, "_assert");
+   AddWildcardBreakpoint(ModuleName, "abort");
+
    return DEBUG_STATUS_GO;
 }
 
@@ -550,7 +575,7 @@ main(int argc, char** argv)
    }
 
    /*
-    * Main even loop.
+    * Main event loop.
     */
 
    for (;;) {
