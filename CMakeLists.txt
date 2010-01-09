@@ -15,6 +15,9 @@ foreach(flag_var
    endif(${flag_var} MATCHES "/MD")
 endforeach(flag_var)
 
+add_definitions( -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS )
+add_definitions( -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS )
+
 include_directories (${WINDBG_SDK_INCLUDE_PATH}) 
 
 add_executable (stackdump stackdump.cpp) 
