@@ -63,6 +63,7 @@ static ULONG g_OutputMask = DEBUG_OUTPUT_DEBUGGEE;
 static PCSTR g_SymbolPath = NULL;
 static PCSTR g_DumpPath = NULL;
 static char g_CommandLine[4096];
+static ULONG g_ExitCode = STILL_ACTIVE;
 
 static IDebugClient* g_Client = NULL;
 static IDebugControl* g_Control = NULL;
@@ -106,7 +107,7 @@ AddBreakpoint(PCSTR expression)
    HRESULT status;
    
    if (g_Verbose) {
-      fprintf(stderr, "Adding breakpoing %s\n", expression);
+      fprintf(stderr, "info: adding breakpoing %s\n", expression);
    }
 
    status = g_Control->AddBreakpoint(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &Bp);
@@ -181,7 +182,7 @@ DumpStack(void)
          fprintf(stderr, "warning: failed to create dump file (0x%08x)\n", status);
       }
       if (g_Verbose) {
-         fprintf(stderr, "%s created\n", g_DumpPath);
+         fprintf(stderr, "info: %s created\n", g_DumpPath);
       }
    }
 }
@@ -263,6 +264,7 @@ public:
                                            ULONG CheckSum, ULONG TimeDateStamp, 
                                            ULONG64 InitialThreadHandle, 
                                            ULONG64 ThreadDataOffset, ULONG64 StartOffset);
+   HRESULT STDMETHODCALLTYPE ExitProcess(ULONG ExitCode);
    HRESULT STDMETHODCALLTYPE LoadModule(ULONG64 ImageFileHandle, ULONG64 BaseOffset, 
                                         ULONG ModuleSize, PCSTR ModuleName, 
                                         PCSTR ImageName, ULONG CheckSum, 
@@ -287,6 +289,7 @@ EventCallbacks::GetInterestMask(PULONG Mask)
    *Mask = DEBUG_EVENT_BREAKPOINT |
            DEBUG_EVENT_EXCEPTION |
            DEBUG_EVENT_CREATE_PROCESS |
+           DEBUG_EVENT_EXIT_PROCESS |
            DEBUG_EVENT_LOAD_MODULE;
    return S_OK;
 }
@@ -304,7 +307,7 @@ HRESULT STDMETHODCALLTYPE
 EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
 {
    if (g_Verbose) {
-      fprintf(stderr, "uncaught exception - code %08lx (%s chance)\n", 
+      fprintf(stderr, "info: uncaught exception - code %08lx (%s chance)\n", 
               Exception->ExceptionCode, FirstChance ? "first" : "second");
    }
 
@@ -387,6 +390,18 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
    
    AddBreakpoint("user32!MessageBoxA");
    AddBreakpoint("user32!MessageBoxW");
+
+   return DEBUG_STATUS_GO;
+}
+
+HRESULT STDMETHODCALLTYPE
+EventCallbacks::ExitProcess(ULONG ExitCode)
+{
+   if (g_Verbose) {
+      fprintf(stderr, "info: program exited with code (0x%0lx)\n", ExitCode);
+   }
+
+   g_ExitCode = ExitCode;
 
    return DEBUG_STATUS_GO;
 }
@@ -602,7 +617,7 @@ main(int argc, char** argv)
 
    Cleanup();
 
-   return 0;
+   return g_ExitCode;
 }
 
 /* vim:set sw=3 et: */
