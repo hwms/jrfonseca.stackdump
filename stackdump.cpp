@@ -27,7 +27,7 @@
 
 /*
  * Simple program to dump a stack trace and produce a minidump file when
- * a child process.
+ * a child process misbehaves.
  *
  * Based on many of the ideas used in the Debugging Tools for Windows SDK's
  * samples, in particular:
