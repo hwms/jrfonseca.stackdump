@@ -25,8 +25,6 @@
  *
  **************************************************************************/
 
-#define _CRT_SECURE_NO_WARNINGS
-
 #include <assert.h>
 #include <crtdbg.h>
 #include <stdio.h>
@@ -36,15 +34,6 @@ YetAnotherFunction(int i)
 {
    int k;
    
-   assert(2+2==5);
-   
-#if 0
-   /* Other ways to cause a GPF */
-   *(int *)i = 5;  
-   __asm ("int $3");
-   (*((void (*)(void)) 0x12345678))();
-#endif
-
    sscanf("12345", "%i", (int *) (k=i));
 }
 
@@ -77,18 +66,6 @@ main(int argc, char *argv[])
 {
    struct AStructType AStruct = {{10, 3}};
    int AnArray[4] = {4, 3, 2, 1};
-   
-#if 0
-   // http://msdn.microsoft.com/en-us/library/sas1dkb2.aspx
-   _set_error_mode(_OUT_TO_STDERR);
-   // http://msdn.microsoft.com/en-us/library/e631wekh.aspx
-   //_set_abort_behavior( 0, _WRITE_ABORT_MSG);
-   
-   //http://msdn.microsoft.com/en-us/library/1y71x448.aspx
-   _CrtSetReportMode( _CRT_WARN, _CRTDBG_MODE_DEBUG );
-   _CrtSetReportMode( _CRT_ERROR, _CRTDBG_MODE_DEBUG );
-   _CrtSetReportMode( _CRT_ASSERT, _CRTDBG_MODE_DEBUG );
-#endif
    
    MyWonderfulFunction( 4, 5.6, AnArray, "Hello" , a, AStruct, ASimpleFunction);
 
