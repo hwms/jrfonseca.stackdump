@@ -16,7 +16,7 @@ add_definitions( -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS )
 
 add_executable (abort abort.c) 
 add_executable (assert assert.c) 
-add_executable (complex complex.c) 
+add_executable (exception exception.c) 
 add_executable (false false.c) 
 add_executable (is_debugger_present is_debugger_present.c) 
 add_executable (output_debug_string output_debug_string.c) 
