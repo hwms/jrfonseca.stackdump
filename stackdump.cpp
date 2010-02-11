@@ -62,6 +62,7 @@ static BOOL g_Verbose = FALSE;
 static ULONG g_OutputMask = DEBUG_OUTPUT_DEBUGGEE;
 static PCSTR g_SymbolPath = NULL;
 static PCSTR g_DumpPath = NULL;
+static ULONG g_DumpFormatFlags = DEBUG_DUMP_SMALL;
 static char g_CommandLine[4096];
 static ULONG g_ExitCode = STILL_ACTIVE;
 
@@ -177,7 +178,7 @@ DumpStack(void)
    }
 
    if (g_DumpPath) {
-      status = g_Client->WriteDumpFile(g_DumpPath, DEBUG_DUMP_SMALL);
+      status = g_Client->WriteDumpFile(g_DumpPath, g_DumpFormatFlags);
       if (status != S_OK) {
          fprintf(stderr, "warning: failed to create dump file (0x%08x)\n", status);
       }
@@ -445,6 +446,7 @@ Usage()
          "\n"
          "options:\n"
          "  -? displays command line help text\n"
+         "  -ma create a full dump file (default is a minidump)\n"
          "  -v enables verbose output from the debugger\n"
          "  -y <symbols-path> specifies the symbol search path (same as _NT_SYMBOL_PATH)\n"
          "  -z <crash-dump-file> specifies the name of a crash dump file to create\n",
@@ -490,6 +492,8 @@ main(int argc, char** argv)
          --argc;
 
          g_DumpPath = *argv;
+      } else if (!strcmp(*argv, "-ma")) {
+         g_DumpFormatFlags = DEBUG_DUMP_DEFAULT;
       } else {
          break;
       }
