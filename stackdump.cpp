@@ -503,30 +503,38 @@ main(int argc, char** argv)
     * Concatenate remaining arguments into a command line
     */
    
-   PSTR CommandLine = g_CommandLine;
+   PSTR pCommandLine = g_CommandLine;
    
    while (argc > 0) {
-      ULONG Len;
+      ULONG length;
+      BOOL quote;
       
-      Len = (ULONG)strlen(*argv);
-      if (Len + 3 + (CommandLine - g_CommandLine) >= sizeof(g_CommandLine)) {
+      length = (ULONG)strlen(*argv);
+      if (length + 3 + (pCommandLine - g_CommandLine) >= sizeof(g_CommandLine)) {
          fprintf(stderr, "error: command line length exceeds %u characters\n", sizeof(g_CommandLine));
          return 1;
       }
 
-      *CommandLine++ = '"';
+      quote = (strchr(*argv, ' ') || strchr(*argv, '\t'));
 
-      memcpy(CommandLine, *argv, Len + 1);
-      CommandLine += Len;
+      if (quote) {
+         *pCommandLine++ = '"';
+      }
 
-      *CommandLine++ = '"';
-      *CommandLine++ = ' ';
+      memcpy(pCommandLine, *argv, length + 1);
+      pCommandLine += length;
+
+      if (quote) {
+         *pCommandLine++ = '"';
+      }
+
+      *pCommandLine++ = ' ';
       
       ++argv;
       --argc;
    }
 
-   *CommandLine = 0;
+   *pCommandLine = 0;
 
    if (strlen(g_CommandLine) == 0) {
       fprintf(stderr, "error: no command line given\n\n");
