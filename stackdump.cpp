@@ -61,10 +61,13 @@
 static BOOL g_Verbose = FALSE;
 static ULONG g_OutputMask = DEBUG_OUTPUT_DEBUGGEE;
 static PCSTR g_SymbolPath = NULL;
+static ULONG g_TimeOut = 0;
 static PCSTR g_DumpPath = NULL;
 static ULONG g_DumpFormatFlags = DEBUG_DUMP_SMALL;
 static char g_CommandLine[4096];
 static ULONG g_ExitCode = STILL_ACTIVE;
+static HANDLE g_hTimer = NULL;
+static HANDLE g_hTimerQueue = NULL;
 
 static IDebugClient* g_Client = NULL;
 static IDebugControl* g_Control = NULL;
@@ -79,6 +82,10 @@ static IDebugSymbols* g_Symbols = NULL;
 static void
 Cleanup(void)
 {
+   if (g_hTimerQueue) {
+      DeleteTimerQueue(g_hTimerQueue);
+   }
+
    if (g_Control) {
       g_Control->Release();
    }
@@ -364,6 +371,20 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
    return DEBUG_STATUS_NO_CHANGE;
 }
 
+static VOID CALLBACK 
+TimeOutCallback(PVOID lpParam, BOOLEAN TimerOrWaitFired)
+{
+   HRESULT status;
+
+   fprintf(stderr, "time out (%lu sec) exceeded\n", g_TimeOut);
+   
+   status = g_Control->SetInterrupt(DEBUG_INTERRUPT_ACTIVE);
+   if (status != S_OK) {
+      fprintf(stderr, "error: failed to interrupt target (0x%08x)\n", status);
+      Abort();
+   }
+}
+
 HRESULT STDMETHODCALLTYPE
 EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
                               ULONG64 Handle,
@@ -391,6 +412,21 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
    
    AddBreakpoint("user32!MessageBoxA");
    AddBreakpoint("user32!MessageBoxW");
+
+   if (g_TimeOut) {
+      g_hTimerQueue = CreateTimerQueue();
+      if (g_hTimerQueue == NULL) {
+         fprintf(stderr, "error: failed to create a timer queue (%d)\n", GetLastError());
+         Abort();
+      }
+
+      if (!CreateTimerQueueTimer(&g_hTimer, g_hTimerQueue, 
+                                (WAITORTIMERCALLBACK)TimeOutCallback, 
+                                NULL , g_TimeOut*1000, 0, 0)) {
+         fprintf(stderr, "error: failed to CreateTimerQueueTimer failed (%d)\n", GetLastError());
+         Abort();
+      }
+   }
 
    return DEBUG_STATUS_GO;
 }
@@ -449,7 +485,8 @@ Usage()
          "  -ma create a full dump file (default is a minidump)\n"
          "  -v enables verbose output from the debugger\n"
          "  -y <symbols-path> specifies the symbol search path (same as _NT_SYMBOL_PATH)\n"
-         "  -z <crash-dump-file> specifies the name of a crash dump file to create\n",
+         "  -z <crash-dump-file> specifies the name of a crash dump file to create\n"
+         "  -t <seconds> specifies a timeout in seconds \n",
          stderr);
 }
 
@@ -470,6 +507,17 @@ main(int argc, char** argv)
          return 0;
       } else if (!strcmp(*argv, "-v")) {
          g_Verbose = TRUE;
+      } else if (!strcmp(*argv, "-t")) {
+         if (argc < 2) {
+            fprintf(stderr, "error: -t missing argument\n\n");
+            Usage();
+            return 1;
+         }
+
+         ++argv;
+         --argc;
+
+         g_TimeOut = atoi(*argv);
       } else if (!strcmp(*argv, "-y")) {
          if (argc < 2) {
             fprintf(stderr, "error: -y missing argument\n\n");
