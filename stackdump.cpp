@@ -615,6 +615,11 @@ main(int argc, char** argv)
       Abort();
    }
 
+   status = g_Symbols->AddSymbolOptions(0x10 /* SYMOPT_LOAD_LINES */);
+   if (status != S_OK) {
+      fprintf(stderr, "warning: failed to add symbol options (0x%08x)\n", status);
+   }
+
    /*
     * Apply command line arguments
     */
