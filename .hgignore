@@ -3,3 +3,4 @@ syntax: glob
 *.zip
 build
 tmp
+sdk
