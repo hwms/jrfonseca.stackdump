@@ -68,6 +68,9 @@ static char g_CommandLine[4096];
 static ULONG g_ExitCode = STILL_ACTIVE;
 static HANDLE g_hTimer = NULL;
 static HANDLE g_hTimerQueue = NULL;
+static DWORD g_ElapsedTime = 0;
+static BOOL g_TimerIgnore = FALSE;
+static const DWORD g_Period = 1000;
 
 static IDebugClient* g_Client = NULL;
 static IDebugControl* g_Control = NULL;
@@ -371,13 +374,53 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
    return DEBUG_STATUS_NO_CHANGE;
 }
 
+static BOOL CALLBACK
+EnumWindowCallback(HWND hWnd, LPARAM lParam)
+{
+   DWORD dwProcessId = 0;
+   HRESULT status;
+
+   GetWindowThreadProcessId(hWnd, &dwProcessId);
+   if (GetWindowLong(hWnd, GWL_STYLE) & DS_MODALFRAME) {
+      if (dwProcessId == lParam) {
+         fprintf(stderr, "message dialog detected\n");
+
+         g_TimerIgnore = TRUE;
+
+         status = g_Control->SetInterrupt(DEBUG_INTERRUPT_ACTIVE);
+         if (status != S_OK) {
+            fprintf(stderr, "error: failed to interrupt target (0x%08x)\n", status);
+            Abort();
+         }
+
+         return FALSE;
+      }
+   }
+
+   return TRUE;
+}
+
 static VOID CALLBACK 
 TimeOutCallback(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 {
+   DWORD dwProcessId = (DWORD)lpParam;
    HRESULT status;
+         
+   if (g_TimerIgnore) {
+      return;
+   }
 
-   fprintf(stderr, "time out (%lu sec) exceeded\n", g_TimeOut);
+   EnumWindows(EnumWindowCallback, (LPARAM)dwProcessId);
+
+   g_ElapsedTime += g_Period;
+   if (g_ElapsedTime < g_TimeOut*1000) {
+      return;
+   }
    
+   fprintf(stderr, "time out (%lu sec) exceeded\n", g_TimeOut);
+
+   g_TimerIgnore = TRUE;
+
    status = g_Control->SetInterrupt(DEBUG_INTERRUPT_ACTIVE);
    if (status != S_OK) {
       fprintf(stderr, "error: failed to interrupt target (0x%08x)\n", status);
@@ -398,6 +441,8 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
                               ULONG64 ThreadDataOffset,
                               ULONG64 StartOffset)
 {
+   DWORD dwProcessId;
+
    UNREFERENCED_PARAMETER(ImageFileHandle);
    UNREFERENCED_PARAMETER(Handle);
    UNREFERENCED_PARAMETER(BaseOffset);
@@ -410,22 +455,19 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
    UNREFERENCED_PARAMETER(ThreadDataOffset);
    UNREFERENCED_PARAMETER(StartOffset);
    
-   AddBreakpoint("user32!MessageBoxA");
-   AddBreakpoint("user32!MessageBoxW");
+   g_hTimerQueue = CreateTimerQueue();
+   if (g_hTimerQueue == NULL) {
+      fprintf(stderr, "error: failed to create a timer queue (%d)\n", GetLastError());
+      Abort();
+   }
 
-   if (g_TimeOut) {
-      g_hTimerQueue = CreateTimerQueue();
-      if (g_hTimerQueue == NULL) {
-         fprintf(stderr, "error: failed to create a timer queue (%d)\n", GetLastError());
-         Abort();
-      }
+   dwProcessId = GetProcessId((HANDLE)Handle);
 
-      if (!CreateTimerQueueTimer(&g_hTimer, g_hTimerQueue, 
-                                (WAITORTIMERCALLBACK)TimeOutCallback, 
-                                NULL , g_TimeOut*1000, 0, 0)) {
-         fprintf(stderr, "error: failed to CreateTimerQueueTimer failed (%d)\n", GetLastError());
-         Abort();
-      }
+   if (!CreateTimerQueueTimer(&g_hTimer, g_hTimerQueue, 
+                             (WAITORTIMERCALLBACK)TimeOutCallback, 
+                             (PVOID)dwProcessId, g_Period, g_Period, 0)) {
+      fprintf(stderr, "error: failed to CreateTimerQueueTimer failed (%d)\n", GetLastError());
+      Abort();
    }
 
    return DEBUG_STATUS_GO;
@@ -459,10 +501,6 @@ EventCallbacks::LoadModule(ULONG64 ImageFileHandle,
    UNREFERENCED_PARAMETER(ImageName);
    UNREFERENCED_PARAMETER(CheckSum);
    UNREFERENCED_PARAMETER(TimeDateStamp);
-
-   AddWildcardBreakpoint(ModuleName, "_wassert");
-   AddWildcardBreakpoint(ModuleName, "_assert");
-   AddWildcardBreakpoint(ModuleName, "abort");
 
    return DEBUG_STATUS_GO;
 }
