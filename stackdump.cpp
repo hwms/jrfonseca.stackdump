@@ -175,14 +175,8 @@ DumpStack(void)
       fprintf(stderr, "warning: failed to output current state (0x%08x)\n", status);
    }
 
-   status = g_Control->OutputStackTrace(DEBUG_OUTCTL_ALL_CLIENTS, 
-                                        NULL,
-                                        50, 
-                                        DEBUG_STACK_COLUMN_NAMES |
-                                        DEBUG_STACK_FRAME_NUMBERS |
-                                        DEBUG_STACK_FRAME_ADDRESSES |
-                                        DEBUG_STACK_SOURCE_LINE |
-                                        DEBUG_STACK_PARAMETERS);
+   /* Print the call stack for all threads. */
+   status = g_Control->Execute(DEBUG_OUTCTL_ALL_CLIENTS, "~*kpn", DEBUG_EXECUTE_NOT_LOGGED);
    if (status != S_OK) {
       fprintf(stderr, "error: failed to output a stack trace (0x%08x)\n", status);
    }
