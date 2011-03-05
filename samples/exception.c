@@ -26,7 +26,6 @@
  **************************************************************************/
 
 #include <assert.h>
-#include <crtdbg.h>
 #include <stdio.h>
 
 static void 
