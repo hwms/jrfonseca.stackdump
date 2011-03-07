@@ -368,6 +368,11 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
    return DEBUG_STATUS_NO_CHANGE;
 }
 
+/*
+ * Periodically scans the desktop for modal dialog windows.
+ *
+ * See also http://msdn.microsoft.com/en-us/library/ms940840.aspx
+ */
 static BOOL CALLBACK
 EnumWindowCallback(HWND hWnd, LPARAM lParam)
 {
