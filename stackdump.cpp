@@ -52,6 +52,50 @@
 #define STATUS_FATAL_APP_EXIT 0x40000015UL
 #endif
 
+#ifndef STATUS_WX86_UNSIMULATE
+#define STATUS_WX86_UNSIMULATE 0x4000001CUL
+#endif
+
+#ifndef STATUS_WX86_CONTINUE
+#define STATUS_WX86_CONTINUE 0x4000001DUL
+#endif
+
+#ifndef STATUS_WX86_SINGLE_STEP
+#define STATUS_WX86_SINGLE_STEP 0x4000001EUL
+#endif
+
+#ifndef STATUS_WX86_BREAKPOINT
+#define STATUS_WX86_BREAKPOINT 0x4000001FUL
+#endif
+
+#ifndef STATUS_WX86_EXCEPTION_CONTINUE
+#define STATUS_WX86_EXCEPTION_CONTINUE 0x40000020UL
+#endif
+
+#ifndef STATUS_WX86_EXCEPTION_LASTCHANCE
+#define STATUS_WX86_EXCEPTION_LASTCHANCE 0x40000021UL
+#endif
+
+#ifndef STATUS_WX86_EXCEPTION_CHAIN
+#define STATUS_WX86_EXCEPTION_CHAIN 0x40000022UL
+#endif
+
+#ifndef STATUS_WX86_CREATEWX86TIB
+#define STATUS_WX86_CREATEWX86TIB 0x40000028UL
+#endif
+
+#ifndef STATUS_ILLEGAL_FLOAT_CONTEXT
+#define STATUS_ILLEGAL_FLOAT_CONTEXT 0xC000014AUL
+#endif
+
+#ifndef STATUS_POSSIBLE_DEADLOCK
+#define STATUS_POSSIBLE_DEADLOCK 0xC0000194UL
+#endif
+
+#ifndef STATUS_DATATYPE_MISALIGNMENT_ERROR
+#define STATUS_DATATYPE_MISALIGNMENT_ERROR 0xC00002C5UL
+#endif
+
 /**************************************************************************
  *
  * Globals
@@ -319,36 +363,51 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
    /*
     * Ignore first chance of non fatal or unknown exceptions to allow an
     * exception handler in the debugee to handled them as usual.
+    *
+    * See http://msdn.microsoft.com/en-us/library/cc704588.aspx
     */
    if(FirstChance) {
       switch(Exception->ExceptionCode) {
 
-      case EXCEPTION_ACCESS_VIOLATION:
-      case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-      case EXCEPTION_BREAKPOINT:
-      case EXCEPTION_DATATYPE_MISALIGNMENT:
-      case EXCEPTION_FLT_DENORMAL_OPERAND:
-      case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-      case EXCEPTION_FLT_INEXACT_RESULT:
-      case EXCEPTION_FLT_INVALID_OPERATION:
-      case EXCEPTION_FLT_OVERFLOW:
-      case EXCEPTION_FLT_STACK_CHECK:
-      case EXCEPTION_FLT_UNDERFLOW:
-      case EXCEPTION_GUARD_PAGE:
-      case EXCEPTION_IN_PAGE_ERROR:
-      case EXCEPTION_INT_DIVIDE_BY_ZERO:
-      case EXCEPTION_INT_OVERFLOW:
-      case EXCEPTION_INVALID_DISPOSITION:
-      case EXCEPTION_INVALID_HANDLE:
-      case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-      case EXCEPTION_PRIV_INSTRUCTION:
-      case EXCEPTION_SINGLE_STEP:
-      case EXCEPTION_STACK_OVERFLOW:
-      case STATUS_FATAL_APP_EXIT:
-         /* Raised in MSVCRT's abort() */
+      case STATUS_ACCESS_VIOLATION:
+      case STATUS_ARRAY_BOUNDS_EXCEEDED:
+      case STATUS_BREAKPOINT:
+      case STATUS_DATATYPE_MISALIGNMENT:
+      case STATUS_DATATYPE_MISALIGNMENT_ERROR:
+      case STATUS_FATAL_APP_EXIT:  /* Raised in MSVCRT's abort() */
+      case STATUS_FLOAT_DENORMAL_OPERAND:
+      case STATUS_FLOAT_DIVIDE_BY_ZERO:
+      case STATUS_FLOAT_INEXACT_RESULT:
+      case STATUS_FLOAT_INVALID_OPERATION:
+      case STATUS_FLOAT_MULTIPLE_FAULTS:
+      case STATUS_FLOAT_MULTIPLE_TRAPS:
+      case STATUS_FLOAT_OVERFLOW:
+      case STATUS_FLOAT_STACK_CHECK:
+      case STATUS_FLOAT_UNDERFLOW:
+      case STATUS_GUARD_PAGE_VIOLATION:
+      case STATUS_ILLEGAL_FLOAT_CONTEXT:
+      case STATUS_INTEGER_DIVIDE_BY_ZERO:
+      case STATUS_INTEGER_OVERFLOW:
+      case STATUS_INVALID_DISPOSITION:
+      case STATUS_INVALID_HANDLE:
+      case STATUS_IN_PAGE_ERROR:
+      case STATUS_NONCONTINUABLE_EXCEPTION:
+      case STATUS_POSSIBLE_DEADLOCK:
+      case STATUS_PRIVILEGED_INSTRUCTION:
+      case STATUS_REG_NAT_CONSUMPTION:
+      case STATUS_SINGLE_STEP:
+      case STATUS_STACK_OVERFLOW:
+      case STATUS_WX86_BREAKPOINT:
+      case STATUS_WX86_CONTINUE:
+      case STATUS_WX86_CREATEWX86TIB:
+      case STATUS_WX86_EXCEPTION_CHAIN:
+      case STATUS_WX86_EXCEPTION_CONTINUE:
+      case STATUS_WX86_EXCEPTION_LASTCHANCE:
+      case STATUS_WX86_SINGLE_STEP:
+      case STATUS_WX86_UNSIMULATE:
          break;
 
-      case EXCEPTION_ILLEGAL_INSTRUCTION:
+      case STATUS_ILLEGAL_INSTRUCTION:
          /* Often used by applications to detect CPU capabilities (e.g. CPUID,
           * MMX, etc) */
       case DBG_CONTROL_C:
@@ -710,7 +769,7 @@ main(int argc, char** argv)
          Abort();
       }
 
-      fprintf(stderr, "warning: ignoring unexpected event\n");
+      fprintf(stderr, "warning: ignoring unexpected event (0x%0x)\n", status);
       status = g_Control->SetExecutionStatus(DEBUG_STATUS_GO_HANDLED);
       if (status != S_OK) {
          fprintf(stderr, "error: failed to proceed (0x%0x)\n", status);
