@@ -591,6 +591,12 @@ int
 main(int argc, char** argv)
 {
    HRESULT status;
+
+   /*
+    * Disable error message boxes.
+    */
+
+   SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
    
    /*
     * Parse command line arguments
