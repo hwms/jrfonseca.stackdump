@@ -115,6 +115,7 @@ static HANDLE g_hTimerQueue = NULL;
 static DWORD g_ElapsedTime = 0;
 static BOOL g_TimerIgnore = FALSE;
 static const DWORD g_Period = 1000;
+static BOOL g_Wow64Process = FALSE;
 
 static IDebugClient* g_Client = NULL;
 static IDebugControl* g_Control = NULL;
@@ -219,10 +220,18 @@ DumpStack(void)
       fprintf(stderr, "warning: failed to output current state (0x%08x)\n", status);
    }
 
+#ifdef _WIN64
+   /* Switch to 32-bit mode. */
+   if (g_Wow64Process) {
+      g_Control->Execute(DEBUG_OUTCTL_ALL_CLIENTS, ".load wow64exts", DEBUG_EXECUTE_NOT_LOGGED);
+      g_Control->Execute(DEBUG_OUTCTL_ALL_CLIENTS, ".effmach x86", DEBUG_EXECUTE_NOT_LOGGED);
+   }
+#endif
+
    /* Print the call stack for all threads. */
    status = g_Control->Execute(DEBUG_OUTCTL_ALL_CLIENTS, "~*kpn", DEBUG_EXECUTE_NOT_LOGGED);
    if (status != S_OK) {
-      fprintf(stderr, "error: failed to output a stack trace (0x%08x)\n", status);
+      fprintf(stderr, "warning: failed to output a stack trace (0x%08x)\n", status);
    }
 
    if (g_DumpPath) {
@@ -500,6 +509,7 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
                               ULONG64 ThreadDataOffset,
                               ULONG64 StartOffset)
 {
+   HANDLE hProcess = (HANDLE)Handle;
    DWORD dwProcessId;
 
    UNREFERENCED_PARAMETER(ImageFileHandle);
@@ -513,6 +523,10 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
    UNREFERENCED_PARAMETER(InitialThreadHandle);
    UNREFERENCED_PARAMETER(ThreadDataOffset);
    UNREFERENCED_PARAMETER(StartOffset);
+
+#ifdef _WIN64
+   IsWow64Process(hProcess, &g_Wow64Process);
+#endif
    
    g_hTimerQueue = CreateTimerQueue();
    if (g_hTimerQueue == NULL) {
@@ -520,7 +534,7 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
       Abort();
    }
 
-   dwProcessId = GetProcessId((HANDLE)Handle);
+   dwProcessId = GetProcessId(hProcess);
 
    if (!CreateTimerQueueTimer(&g_hTimer, g_hTimerQueue, 
                              (WAITORTIMERCALLBACK)TimeOutCallback, 
