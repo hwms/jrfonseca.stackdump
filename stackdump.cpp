@@ -292,8 +292,10 @@ StdioOutputCallbacks::Release()
 HRESULT STDMETHODCALLTYPE
 StdioOutputCallbacks::Output(ULONG Mask, PCSTR Text)
 {
-   if(Mask & g_OutputMask)
+   if (Mask & g_OutputMask) {
       fputs(Text, stderr);
+      fflush(stderr);
+   }
    return S_OK;
 }
 
