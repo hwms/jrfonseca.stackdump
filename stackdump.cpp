@@ -152,7 +152,7 @@ static void
 Abort(void)
 {
    Cleanup();
-   
+
    exit(1);
 }
 
@@ -161,7 +161,7 @@ AddBreakpoint(PCSTR expression)
 {
    IDebugBreakpoint* Bp;
    HRESULT status;
-   
+
    if (g_Verbose) {
       fprintf(stderr, "info: adding breakpoing %s\n", expression);
    }
@@ -177,7 +177,7 @@ AddBreakpoint(PCSTR expression)
       fprintf(stderr, "warning: failed to set breakpoint expression %s (0x%08x)\n", expression, status);
       return status;
    }
-   
+
    status = Bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
    if (status != S_OK) {
       fprintf(stderr, "warning: failed to enable breakpoint %s (0x%08x)\n", expression, status);
@@ -211,7 +211,7 @@ DumpStack(void)
 
    g_OutputMask = ~0;
 
-   status = g_Control->OutputCurrentState(DEBUG_OUTCTL_ALL_CLIENTS, 
+   status = g_Control->OutputCurrentState(DEBUG_OUTCTL_ALL_CLIENTS,
                                           DEBUG_CURRENT_SYMBOL |
                                           DEBUG_CURRENT_DISASM |
                                           DEBUG_CURRENT_REGISTERS |
@@ -256,7 +256,7 @@ class StdioOutputCallbacks : public IDebugOutputCallbacks
 public:
    /* IUnknown */
    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID InterfaceId, PVOID* Interface);
-   ULONG STDMETHODCALLTYPE AddRef(); 
+   ULONG STDMETHODCALLTYPE AddRef();
    ULONG STDMETHODCALLTYPE Release();
 
    /* IDebugOutputCallbacks */
@@ -318,16 +318,16 @@ public:
    HRESULT STDMETHODCALLTYPE GetInterestMask(PULONG Mask);
    HRESULT STDMETHODCALLTYPE Breakpoint(PDEBUG_BREAKPOINT Bp);
    HRESULT STDMETHODCALLTYPE Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance);
-   HRESULT STDMETHODCALLTYPE CreateProcess(ULONG64 ImageFileHandle, ULONG64 Handle, 
-                                           ULONG64 BaseOffset, ULONG ModuleSize, 
-                                           PCSTR ModuleName, PCSTR ImageName, 
-                                           ULONG CheckSum, ULONG TimeDateStamp, 
-                                           ULONG64 InitialThreadHandle, 
+   HRESULT STDMETHODCALLTYPE CreateProcess(ULONG64 ImageFileHandle, ULONG64 Handle,
+                                           ULONG64 BaseOffset, ULONG ModuleSize,
+                                           PCSTR ModuleName, PCSTR ImageName,
+                                           ULONG CheckSum, ULONG TimeDateStamp,
+                                           ULONG64 InitialThreadHandle,
                                            ULONG64 ThreadDataOffset, ULONG64 StartOffset);
    HRESULT STDMETHODCALLTYPE ExitProcess(ULONG ExitCode);
-   HRESULT STDMETHODCALLTYPE LoadModule(ULONG64 ImageFileHandle, ULONG64 BaseOffset, 
-                                        ULONG ModuleSize, PCSTR ModuleName, 
-                                        PCSTR ImageName, ULONG CheckSum, 
+   HRESULT STDMETHODCALLTYPE LoadModule(ULONG64 ImageFileHandle, ULONG64 BaseOffset,
+                                        ULONG ModuleSize, PCSTR ModuleName,
+                                        PCSTR ImageName, ULONG CheckSum,
                                         ULONG TimeDateStamp);
 };
 
@@ -337,7 +337,7 @@ EventCallbacks::AddRef()
    return 1;
 }
 
-ULONG STDMETHODCALLTYPE 
+ULONG STDMETHODCALLTYPE
 EventCallbacks::Release()
 {
    return 0;
@@ -359,7 +359,7 @@ EventCallbacks::Breakpoint(PDEBUG_BREAKPOINT Bp)
 {
    DumpStack();
    Abort();
-   
+
    return DEBUG_STATUS_GO;
 }
 
@@ -367,7 +367,7 @@ HRESULT STDMETHODCALLTYPE
 EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
 {
    if (g_Verbose) {
-      fprintf(stderr, "info: uncaught exception - code %08lx (%s chance)\n", 
+      fprintf(stderr, "info: uncaught exception - code %08lx (%s chance)\n",
               Exception->ExceptionCode, FirstChance ? "first" : "second");
    }
 
@@ -426,15 +426,15 @@ EventCallbacks::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
          return DEBUG_STATUS_NO_CHANGE;
       }
    }
-   
+
    if (!g_Verbose) {
-      fprintf(stderr, "uncaught exception - code %08lx (%s chance)\n", 
+      fprintf(stderr, "uncaught exception - code %08lx (%s chance)\n",
               Exception->ExceptionCode, FirstChance ? "first" : "second");
    }
 
    DumpStack();
    Abort();
-   
+
    return DEBUG_STATUS_NO_CHANGE;
 }
 
@@ -469,12 +469,12 @@ EnumWindowCallback(HWND hWnd, LPARAM lParam)
    return TRUE;
 }
 
-static VOID CALLBACK 
+static VOID CALLBACK
 TimeOutCallback(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 {
    DWORD dwProcessId = (DWORD)lpParam;
    HRESULT status;
-         
+
    if (g_TimerIgnore) {
       return;
    }
@@ -486,7 +486,7 @@ TimeOutCallback(PVOID lpParam, BOOLEAN TimerOrWaitFired)
    if (!g_TimeOut || g_ElapsedTime < g_TimeOut*1000) {
       return;
    }
-   
+
    fprintf(stderr, "time out (%lu sec) exceeded\n", g_TimeOut);
 
    g_TimerIgnore = TRUE;
@@ -529,7 +529,7 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
 #ifdef _WIN64
    IsWow64Process(hProcess, &g_Wow64Process);
 #endif
-   
+
    g_hTimerQueue = CreateTimerQueue();
    if (g_hTimerQueue == NULL) {
       fprintf(stderr, "error: failed to create a timer queue (%d)\n", GetLastError());
@@ -538,8 +538,8 @@ EventCallbacks::CreateProcess(ULONG64 ImageFileHandle,
 
    dwProcessId = GetProcessId(hProcess);
 
-   if (!CreateTimerQueueTimer(&g_hTimer, g_hTimerQueue, 
-                             (WAITORTIMERCALLBACK)TimeOutCallback, 
+   if (!CreateTimerQueueTimer(&g_hTimer, g_hTimerQueue,
+                             (WAITORTIMERCALLBACK)TimeOutCallback,
                              (PVOID)dwProcessId, g_Period, g_Period, 0)) {
       fprintf(stderr, "error: failed to CreateTimerQueueTimer failed (%d)\n", GetLastError());
       Abort();
@@ -613,7 +613,7 @@ main(int argc, char** argv)
     */
 
    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
-   
+
    /*
     * Parse command line arguments
     */
@@ -665,17 +665,17 @@ main(int argc, char** argv)
          break;
       }
    }
-   
+
    /*
     * Concatenate remaining arguments into a command line
     */
-   
+
    PSTR pCommandLine = g_CommandLine;
-   
+
    while (argc > 0) {
       ULONG length;
       BOOL quote;
-      
+
       length = (ULONG)strlen(*argv);
       if (length + 3 + (pCommandLine - g_CommandLine) >= sizeof(g_CommandLine)) {
          fprintf(stderr, "error: command line length exceeds %u characters\n", sizeof(g_CommandLine));
@@ -696,7 +696,7 @@ main(int argc, char** argv)
       }
 
       *pCommandLine++ = ' ';
-      
+
       ++argv;
       --argc;
    }
@@ -766,7 +766,7 @@ main(int argc, char** argv)
       fprintf(stderr, "error: failed to capture debug events (0x%08x)\n", status);
       Abort();
    }
-   
+
    status = g_Client->CreateProcess(0, g_CommandLine, DEBUG_ONLY_THIS_PROCESS);
    if (status != S_OK) {
       fprintf(stderr, "error: failed to create the process (0x%08x)\n", status);
@@ -781,7 +781,7 @@ main(int argc, char** argv)
       status = g_Control->WaitForEvent(DEBUG_WAIT_DEFAULT, INFINITE);
       if (status != S_OK) {
          ULONG ExecStatus;
-         
+
          if (g_Control->GetExecutionStatus(&ExecStatus) == S_OK &&
              ExecStatus == DEBUG_STATUS_NO_DEBUGGEE) {
             break;
